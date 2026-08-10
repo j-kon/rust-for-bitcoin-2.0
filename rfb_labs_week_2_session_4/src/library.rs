@@ -110,8 +110,38 @@ impl Library {
 
     /// Returns the late fee owed, in cents.
     pub fn return_item(&mut self, item_id: u32, day: u32) -> Result<u32, LibraryError> {
-        // TODO(Part 6): checked subtraction must return InvalidReturnDay.
-        let _ = (item_id, day);
-        todo!("return an item")
+        let item = self
+            .items
+            .iter()
+            .find(|i| i.id == item_id)
+            .ok_or(LibraryError::ItemNotFound { id: item_id })?;
+
+        let (borrower_id, day_borrowed) = match item.status {
+            LoanStatus::Lost => return Err(LibraryError::ItemIsLost { id: item_id }),
+            LoanStatus::Available => return Err(LibraryError::ItemNotOnLoan { id: item_id }),
+            LoanStatus::OnLoan {
+                member_id,
+                day_borrowed,
+            } => (member_id, day_borrowed),
+        };
+
+        if day < day_borrowed {
+            return Err(LibraryError::InvalidReturnDay {
+                day_borrowed,
+                day_returned: day,
+            });
+        }
+
+        let days_held = day - day_borrowed;
+        let fee_cents = item.late_fee_cents(days_held);
+
+        let item_mut = self.items.iter_mut().find(|i| i.id == item_id).unwrap();
+        item_mut.status = LoanStatus::Available;
+
+        if let Some(member_mut) = self.members.iter_mut().find(|m| m.id == borrower_id) {
+            member_mut.borrowed_item_ids.retain(|&id| id != item_id);
+        }
+
+        Ok(fee_cents)
     }
 }

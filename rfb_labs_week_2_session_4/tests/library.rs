@@ -73,7 +73,6 @@ fn a_member_cannot_exceed_the_borrow_limit() {
 }
 
 #[test]
-#[ignore = "enable after completing Parts 4 and 6"]
 fn returning_a_book_late_charges_a_daily_fee() {
     let mut library = library_with_items();
 
