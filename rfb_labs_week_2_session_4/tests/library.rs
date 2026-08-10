@@ -40,7 +40,6 @@ fn library_with_items() -> Library {
 // implement the TODOs. Remove `#[ignore]` from one test at a time while working.
 
 #[test]
-#[ignore = "enable after completing Parts 3 and 5"]
 fn checkout_updates_both_the_item_and_the_member() {
     let mut library = library_with_items();
 
@@ -57,7 +56,6 @@ fn checkout_updates_both_the_item_and_the_member() {
 }
 
 #[test]
-#[ignore = "enable after completing Part 5"]
 fn a_member_cannot_exceed_the_borrow_limit() {
     let mut library = library_with_items();
 

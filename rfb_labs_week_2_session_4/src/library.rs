@@ -1,4 +1,4 @@
-use crate::catalogue::{Item, LoanTerms};
+use crate::catalogue::{Item, LoanStatus, LoanTerms};
 use crate::error::LibraryError;
 use crate::member::Member;
 
@@ -63,10 +63,49 @@ impl Library {
     }
 
     pub fn checkout(&mut self, item_id: u32, member_id: u32, day: u32) -> Result<(), LibraryError> {
-        // TODO(Part 5): validate in the order given in ASSIGNMENT.md, then
-        // update the item's status and the member's list together.
-        let _ = (item_id, member_id, day);
-        todo!("check an item out")
+        let item = self
+            .items
+            .iter()
+            .find(|i| i.id == item_id)
+            .ok_or(LibraryError::ItemNotFound { id: item_id })?;
+
+        let member = self
+            .members
+            .iter()
+            .find(|m| m.id == member_id)
+            .ok_or(LibraryError::MemberNotFound { id: member_id })?;
+
+        match item.status {
+            LoanStatus::Lost => return Err(LibraryError::ItemIsLost { id: item_id }),
+            LoanStatus::OnLoan {
+                member_id: borrower_id,
+                ..
+            } => {
+                return Err(LibraryError::ItemAlreadyOnLoan {
+                    id: item_id,
+                    member_id: borrower_id,
+                });
+            }
+            LoanStatus::Available => {}
+        }
+
+        if member.borrowed_item_ids.len() >= MAX_ITEMS_PER_MEMBER {
+            return Err(LibraryError::BorrowLimitReached {
+                member_id,
+                limit: MAX_ITEMS_PER_MEMBER,
+            });
+        }
+
+        let item_mut = self.items.iter_mut().find(|i| i.id == item_id).unwrap();
+        item_mut.status = LoanStatus::OnLoan {
+            member_id,
+            day_borrowed: day,
+        };
+
+        let member_mut = self.members.iter_mut().find(|m| m.id == member_id).unwrap();
+        member_mut.borrowed_item_ids.push(item_id);
+
+        Ok(())
     }
 
     /// Returns the late fee owed, in cents.
