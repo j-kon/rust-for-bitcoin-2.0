@@ -101,4 +101,18 @@ search.
 
 ## Example output
 
-Paste the output of `cargo run` here once Part 8 is complete.
+```text
+=== Initial Stock ===
+[1] "The Rust Programming Language" by Steve Klabnik (Book (560 pages)) - Available
+[2] "Project Hail Mary" by Andy Weir (Audiobook (540 mins)) - Available
+[3] "Programming Bitcoin" by Jimmy Song (Ebook (4500 KB)) - Available
+
+=== Checking out Item #1 on Day 5 ===
+Checked out: [1] "The Rust Programming Language" by Steve Klabnik (Book (560 pages)) - On Loan to member 100 since day 5
+
+=== Returning Item #1 on Day 35 ===
+Item returned successfully. Late fee owed: 225 cents ($2.25)
+
+=== Triggering Handled Error ===
+Handled expected error: item 999 not found
+```
