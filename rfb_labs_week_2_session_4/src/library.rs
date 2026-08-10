@@ -47,15 +47,19 @@ impl Library {
         self.members.iter().find(|m| m.id == id)
     }
 
+    pub fn filter_items<F>(&self, predicate: F) -> Vec<&Item>
+    where
+        F: Fn(&Item) -> bool,
+    {
+        self.items.iter().filter(|item| predicate(item)).collect()
+    }
+
     pub fn items_by_author<'a>(&'a self, author: &str) -> Vec<&'a Item> {
-        self.items.iter().filter(|i| i.author == author).collect()
+        self.filter_items(|i| i.author == author)
     }
 
     pub fn available_items(&self) -> Vec<&Item> {
-        self.items
-            .iter()
-            .filter(|i| matches!(i.status, crate::catalogue::LoanStatus::Available))
-            .collect()
+        self.filter_items(|i| matches!(i.status, LoanStatus::Available))
     }
 
     pub fn longest_loan_item(&self) -> Option<&Item> {

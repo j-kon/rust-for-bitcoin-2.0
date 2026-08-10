@@ -273,3 +273,15 @@ fn longest_loan_item_query() {
     // Book has 21 days (highest)
     assert_eq!(longest.kind.loan_days(), 21);
 }
+
+#[test]
+fn filter_items_generic_predicate() {
+    let library = library_with_items();
+    // Filter books with pages > 200
+    let large_books = library.filter_items(|i| match i.kind {
+        MediaKind::Book { pages } => pages > 200,
+        _ => false,
+    });
+    assert_eq!(large_books.len(), 1);
+    assert_eq!(large_books[0].title, "Dune");
+}
