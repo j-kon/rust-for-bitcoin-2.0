@@ -29,6 +29,48 @@ cargo clippy --all-targets --all-features -- -D warnings
 unfinished code; enable them progressively rather than leaving them ignored in
 the submission.
 
+## Ownership and Borrowing Experiments
+
+### Experiment A
+
+```text
+error[E0382]: borrow of moved value: `item`
+  --> src/main.rs:14:20
+   |
+ 7 |     let item = rfb_labs_week_2_session_4::Item::new(
+   |         ---- move occurs because `item` has type `Item`, which does not implement the `Copy` trait
+...
+13 |     library.add_item(item)?;
+   |                      ---- value moved here
+14 |     println!("{}", item.title);
+   |                    ^^^^^^^^^^ value borrowed here after move
+```
+
+#### Explanation
+- **What value was moved:** The variable `item` of type `Item` was passed by value into `library.add_item(item)`.
+- **Why ownership transferred:** `add_item` takes ownership (`item: Item`) to store the item inside `Library`'s internal `items: Vec<Item>` collection. Because `Item` contains `String` fields and does not implement `Copy`, ownership is transferred into the library.
+- **Why later use is rejected:** Once moved, `item` in the caller's stack frame becomes uninitialized and invalid. Attempting to read `item.title` violates Rust's move semantics.
+- **What would change if borrowed:** If `add_item` took `&Item`, `Library` would either need to clone the entire item or store borrowed references requiring explicit lifetimes across the struct. Taking ownership by value is the cleanest approach.
+
+### Experiment B
+
+```text
+error[E0502]: cannot borrow `library` as mutable because it is also borrowed as immutable
+  --> src/main.rs:18:5
+   |
+17 |     let held = library.find_item(1);
+   |                ------- immutable borrow occurs here
+18 |     library.checkout(1, 100, 5)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow occurs here
+19 |     if let Some(i) = held {
+   |                      ---- immutable borrow later used here
+```
+
+#### Explanation
+- **Borrow conflict:** `let held = library.find_item(1);` creates an immutable reference (`&Item`) tied to the lifetime of `library`. Calling `library.checkout(...)` on line 18 requires an exclusive mutable reference (`&mut library`).
+- **Rust Aliasing Rule:** Rust's borrow checker prohibits simultaneous active immutable and mutable borrows to the same data structure to guarantee memory safety and prevent data races.
+- **Resolution:** Narrowing the scope of `held` so that the immutable reference drops before calling `checkout` (or performing lookups sequentially) satisfies the borrow checker.
+
 ## Written answers
 
 Answer in your own words. Add both ownership compiler errors from Part 7 as
