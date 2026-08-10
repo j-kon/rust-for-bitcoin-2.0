@@ -94,7 +94,6 @@ fn returning_a_book_late_charges_a_daily_fee() {
 }
 
 #[test]
-#[ignore = "enable after completing Part 3"]
 fn searching_by_author_borrows_rather_than_clones() {
     let library = library_with_items();
 
