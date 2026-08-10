@@ -1,4 +1,4 @@
-use crate::catalogue::Item;
+use crate::catalogue::{Item, LoanTerms};
 use crate::error::LibraryError;
 use crate::member::Member;
 
@@ -59,8 +59,7 @@ impl Library {
     }
 
     pub fn longest_loan_item(&self) -> Option<&Item> {
-        // TODO(Part 4): the item that may be kept longest, via `LoanTerms`.
-        todo!("find the longest-loan item")
+        self.items.iter().max_by_key(|i| i.loan_days())
     }
 
     pub fn checkout(&mut self, item_id: u32, member_id: u32, day: u32) -> Result<(), LibraryError> {
