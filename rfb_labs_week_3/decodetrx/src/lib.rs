@@ -69,6 +69,20 @@ pub fn read_txid(transaction_bytes: &mut &[u8]) -> Result<transaction::Txid, Err
     Ok(transaction::Txid::from_bytes(reversed))
 }
 
+pub fn read_script_bytes(transaction_bytes: &mut &[u8]) -> Result<Vec<u8>, Error> {
+    let len = read_compact_size(transaction_bytes)?;
+    let len_usize = usize::try_from(len).map_err(|_| {
+        Error::new(ErrorKind::InvalidData, "script length exceeds memory limits")
+    })?;
+    let bytes = read_bytes(transaction_bytes, len_usize)?;
+    Ok(bytes.to_vec())
+}
+
+pub fn read_script_size(transaction_bytes: &mut &[u8]) -> Result<String, Error> {
+    let bytes = read_script_bytes(transaction_bytes)?;
+    Ok(hex::encode(bytes))
+}
+
 pub fn read_version_byte(transaction_bytes: &mut &[u8]) -> Result<u32, Error> {
     read_u32(transaction_bytes)
 }
