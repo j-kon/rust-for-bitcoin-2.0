@@ -2,6 +2,8 @@ use std::io::{Error, ErrorKind};
 
 pub mod transaction;
 
+/// Reads a slice of `len` bytes from the input buffer.
+/// Returns an `UnexpectedEof` error if fewer than `len` bytes remain.
 pub fn read_bytes<'a>(slice: &mut &'a [u8], len: usize) -> Result<&'a [u8], Error> {
     if slice.len() < len {
         return Err(Error::new(
@@ -14,6 +16,7 @@ pub fn read_bytes<'a>(slice: &mut &'a [u8], len: usize) -> Result<&'a [u8], Erro
     Ok(head)
 }
 
+/// Reads a single 8-bit unsigned integer.
 pub fn read_u8(bytes: &mut &[u8]) -> Result<u8, Error> {
     let buf = read_bytes(bytes, 1)?;
     Ok(buf[0])
