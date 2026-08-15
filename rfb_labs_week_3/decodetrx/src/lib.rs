@@ -87,6 +87,21 @@ pub fn read_version_byte(transaction_bytes: &mut &[u8]) -> Result<u32, Error> {
     read_u32(transaction_bytes)
 }
 
+pub fn hash_raw_transaction(raw_transaction_bytes: &[u8]) -> Result<transaction::Txid, Error> {
+    use sha2::{Digest, Sha256};
+    let first_hash = Sha256::digest(raw_transaction_bytes);
+    let second_hash = Sha256::digest(first_hash);
+    let mut reversed = [0u8; 32];
+    for i in 0..32 {
+        reversed[i] = second_hash[31 - i];
+    }
+    Ok(transaction::Txid::from_bytes(reversed))
+}
+
+pub fn hash_row_transaction(row_transaction_bytes: &[u8]) -> Result<transaction::Txid, Error> {
+    hash_raw_transaction(row_transaction_bytes)
+}
+
 pub fn decode_transaction(_transaction_hex: String) -> Result<String, Box<dyn std::error::Error>> {
     Ok(String::new())
 }
