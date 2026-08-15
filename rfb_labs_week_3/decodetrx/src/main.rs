@@ -1,14 +1,30 @@
 use clap::{Arg, Command};
 use decodetrx::decode_transaction;
+use std::process::exit;
 
 fn main() {
-    // Define CLI using Clap
-   
-    // Retrieve transaction hex argument
-    
+    let matches = Command::new("decodetrx")
+        .version("1.0")
+        .about("Bitcoin Transaction Decoder")
+        .arg(
+            Arg::new("transaction_hex")
+                .help("Raw Bitcoin transaction hex string")
+                .required(true)
+                .index(1),
+        )
+        .get_matches();
 
-    // Call the decoder function from the library
-    
+    let hex_input = matches
+        .get_one::<String>("transaction_hex")
+        .expect("transaction_hex is required");
+
+    match decode_transaction(hex_input.clone()) {
+        Ok(json_output) => {
+            println!("{json_output}");
+        }
+        Err(err) => {
+            eprintln!("Error decoding transaction: {err}");
+            exit(1);
+        }
+    }
 }
-
-// // https://mempool.space/testnet/tx/3c1804567a336c3944e30b3c2593970bfcbf5b15a40f4fc6b626a360ee0507f2
