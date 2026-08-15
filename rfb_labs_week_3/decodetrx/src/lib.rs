@@ -87,4 +87,34 @@ mod tests {
         assert_eq!(read_u64(&mut slice).unwrap(), 100);
         assert!(slice.is_empty());
     }
+
+    #[test]
+    fn test_compact_size_variants() {
+        // Direct u8
+        let bytes_u8 = [0x2a];
+        let mut slice = &bytes_u8[..];
+        assert_eq!(read_compact_size(&mut slice).unwrap(), 42);
+
+        // 0xfd -> u16 LE
+        let bytes_u16 = [0xfd, 0x00, 0x02];
+        let mut slice = &bytes_u16[..];
+        assert_eq!(read_compact_size(&mut slice).unwrap(), 512);
+
+        // 0xfe -> u32 LE
+        let bytes_u32 = [0xfe, 0x00, 0x00, 0x01, 0x00];
+        let mut slice = &bytes_u32[..];
+        assert_eq!(read_compact_size(&mut slice).unwrap(), 65536);
+
+        // 0xff -> u64 LE
+        let bytes_u64 = [0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00];
+        let mut slice = &bytes_u64[..];
+        assert_eq!(read_compact_size(&mut slice).unwrap(), 4294967296);
+    }
+
+    #[test]
+    fn test_compact_size_truncated() {
+        let bytes_truncated = [0xfd, 0x01];
+        let mut slice = &bytes_truncated[..];
+        assert!(read_compact_size(&mut slice).is_err());
+    }
 }
