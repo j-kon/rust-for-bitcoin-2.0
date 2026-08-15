@@ -41,6 +41,25 @@ pub fn read_amount(transaction_bytes: &mut &[u8]) -> Result<transaction::Amount,
     Ok(transaction::Amount::from_sat(sat))
 }
 
+pub fn read_compact_size(transaction_bytes: &mut &[u8]) -> Result<u64, Error> {
+    let n = read_u8(transaction_bytes)?;
+    match n {
+        0x00..=0xfc => Ok(n as u64),
+        0xfd => {
+            let val = read_u16_le(transaction_bytes)?;
+            Ok(val as u64)
+        }
+        0xfe => {
+            let val = read_u32(transaction_bytes)?;
+            Ok(val as u64)
+        }
+        0xff => {
+            let val = read_u64(transaction_bytes)?;
+            Ok(val)
+        }
+    }
+}
+
 pub fn read_version_byte(transaction_bytes: &mut &[u8]) -> Result<u32, Error> {
     read_u32(transaction_bytes)
 }
