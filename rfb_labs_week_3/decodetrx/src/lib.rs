@@ -60,6 +60,15 @@ pub fn read_compact_size(transaction_bytes: &mut &[u8]) -> Result<u64, Error> {
     }
 }
 
+pub fn read_txid(transaction_bytes: &mut &[u8]) -> Result<transaction::Txid, Error> {
+    let raw = read_bytes(transaction_bytes, 32)?;
+    let mut reversed = [0u8; 32];
+    for i in 0..32 {
+        reversed[i] = raw[31 - i];
+    }
+    Ok(transaction::Txid::from_bytes(reversed))
+}
+
 pub fn read_version_byte(transaction_bytes: &mut &[u8]) -> Result<u32, Error> {
     read_u32(transaction_bytes)
 }
