@@ -80,7 +80,10 @@ pub fn read_txid(transaction_bytes: &mut &[u8]) -> Result<transaction::Txid, Err
 pub fn read_script_bytes(transaction_bytes: &mut &[u8]) -> Result<Vec<u8>, Error> {
     let len = read_compact_size(transaction_bytes)?;
     let len_usize = usize::try_from(len).map_err(|_| {
-        Error::new(ErrorKind::InvalidData, "script length exceeds memory limits")
+        Error::new(
+            ErrorKind::InvalidData,
+            "script length exceeds memory limits",
+        )
     })?;
     let bytes = read_bytes(transaction_bytes, len_usize)?;
     Ok(bytes.to_vec())
