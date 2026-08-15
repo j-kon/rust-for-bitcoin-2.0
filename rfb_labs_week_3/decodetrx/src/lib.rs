@@ -29,6 +29,18 @@ pub fn read_u32(bytes_slice: &mut &[u8]) -> Result<u32, Error> {
     Ok(u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]))
 }
 
+pub fn read_u64(transaction_bytes: &mut &[u8]) -> Result<u64, Error> {
+    let buf = read_bytes(transaction_bytes, 8)?;
+    Ok(u64::from_le_bytes([
+        buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+    ]))
+}
+
+pub fn read_amount(transaction_bytes: &mut &[u8]) -> Result<transaction::Amount, Error> {
+    let sat = read_u64(transaction_bytes)?;
+    Ok(transaction::Amount::from_sat(sat))
+}
+
 pub fn read_version_byte(transaction_bytes: &mut &[u8]) -> Result<u32, Error> {
     read_u32(transaction_bytes)
 }
@@ -46,6 +58,14 @@ mod tests {
         let bytes = [0x02, 0x00, 0x00, 0x00];
         let mut slice = &bytes[..];
         assert_eq!(read_u32(&mut slice).unwrap(), 2);
+        assert!(slice.is_empty());
+    }
+
+    #[test]
+    fn test_read_u64_le() {
+        let bytes = [0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let mut slice = &bytes[..];
+        assert_eq!(read_u64(&mut slice).unwrap(), 100);
         assert!(slice.is_empty());
     }
 }
