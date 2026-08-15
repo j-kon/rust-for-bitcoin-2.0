@@ -102,8 +102,101 @@ pub fn hash_row_transaction(row_transaction_bytes: &[u8]) -> Result<transaction:
     hash_raw_transaction(row_transaction_bytes)
 }
 
-pub fn decode_transaction(_transaction_hex: String) -> Result<String, Box<dyn std::error::Error>> {
-    Ok(String::new())
+pub fn decode_transaction(transaction_hex: String) -> Result<String, Box<dyn std::error::Error>> {
+    use transaction::{Input, Output, Transaction};
+
+    let trimmed = transaction_hex.trim();
+    if trimmed.is_empty() {
+        return Err("empty transaction hex input".into());
+    }
+    let raw_bytes = hex::decode(trimmed)?;
+    let mut cursor = raw_bytes.as_slice();
+
+    // 1. Version (4 bytes LE)
+    let version = read_u32(&mut cursor)?;
+
+    // 2. Check SegWit Marker and Flag (0x00 0x01)
+    let is_segwit = cursor.len() >= 2 && cursor[0] == 0x00 && cursor[1] == 0x01;
+    if is_segwit {
+        read_bytes(&mut cursor, 2)?;
+    }
+
+    let inputs_start_offset = raw_bytes.len() - cursor.len();
+
+    // 3. Inputs
+    let in_count = read_compact_size(&mut cursor)?;
+    let mut inputs = Vec::with_capacity(in_count as usize);
+    for _ in 0..in_count {
+        let prev_txid = read_txid(&mut cursor)?;
+        let vout = read_u32(&mut cursor)?;
+        let script_sig = read_script_bytes(&mut cursor)?;
+        let sequence = read_u32(&mut cursor)?;
+        inputs.push(Input {
+            txid: prev_txid,
+            output_index: vout,
+            script_sig,
+            sequence,
+        });
+    }
+
+    // 4. Outputs
+    let out_count = read_compact_size(&mut cursor)?;
+    let mut outputs = Vec::with_capacity(out_count as usize);
+    for _ in 0..out_count {
+        let amount = read_amount(&mut cursor)?;
+        let script_pubkey = read_script_bytes(&mut cursor)?;
+        outputs.push(Output {
+            amount,
+            script_pubkey,
+        });
+    }
+
+    let outputs_end_offset = raw_bytes.len() - cursor.len();
+
+    // 5. Witness Data (SegWit only)
+    if is_segwit {
+        for _ in 0..in_count {
+            let item_count = read_compact_size(&mut cursor)?;
+            for _ in 0..item_count {
+                let _item_bytes = read_script_bytes(&mut cursor)?;
+            }
+        }
+    }
+
+    // 6. Locktime (4 bytes LE)
+    let locktime_offset = raw_bytes.len() - cursor.len();
+    let lock_time = read_u32(&mut cursor)?;
+
+    if !cursor.is_empty() {
+        return Err(format!(
+            "unexpected trailing {} byte(s) after transaction locktime",
+            cursor.len()
+        )
+        .into());
+    }
+
+    // 7. TXID Calculation (Double-SHA256 of non-witness serialization)
+    let txid = if is_segwit {
+        let mut legacy_payload =
+            Vec::with_capacity(4 + (outputs_end_offset - inputs_start_offset) + 4);
+        legacy_payload.extend_from_slice(&raw_bytes[0..4]);
+        legacy_payload.extend_from_slice(&raw_bytes[inputs_start_offset..outputs_end_offset]);
+        legacy_payload.extend_from_slice(&raw_bytes[locktime_offset..]);
+        hash_raw_transaction(&legacy_payload)?
+    } else {
+        hash_raw_transaction(&raw_bytes)?
+    };
+
+    let tx_struct = Transaction {
+        transaction_id: txid,
+        version,
+        inputs,
+        outputs,
+        lock_time,
+    };
+
+    let json = serde_json::to_string_pretty(&tx_struct)?;
+    Ok(json)
 }
 
 #[cfg(test)]
