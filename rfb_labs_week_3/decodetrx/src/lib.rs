@@ -1,71 +1,51 @@
-use std::io::{Read, Error};
-// use clap::{Parser, Subcommand};
-use clap::{Arg, Command};
-use std::fmt;
-use sha2::{Sha256, Sha512, Digest}; // https://docs.rs/sha2/latest/sha2/
-use transaction::{Amount, Input, Output, Transaction, Txid};
-mod transaction;
+use std::io::{Error, ErrorKind};
 
-// #[derive(Parser)]
-// #[command(name= " Transaction decoder")]
-// #[command(version= "1.0")]
-// #[command(about= "Bitcoin Transaction decoder", long_about=None)]
-// struct CLI {
-//       #[arg(
-//             required = true,
-//             help="(string, required) Row Transaction hex"
-//         )]
-//     transaction_hex: String
-// }
+pub mod transaction;
 
-
-#[allow(unused_variables)]
-fn read_version(transaction_hex: &str) -> u32 {
- 
+pub fn read_bytes<'a>(slice: &mut &'a [u8], len: usize) -> Result<&'a [u8], Error> {
+    if slice.len() < len {
+        return Err(Error::new(
+            ErrorKind::UnexpectedEof,
+            format!("needed {len} bytes, but only {} available", slice.len()),
+        ));
+    }
+    let (head, tail) = slice.split_at(len);
+    *slice = tail;
+    Ok(head)
 }
 
-
-fn read_u64(transaction_bytes: &mut &[u8]) -> u64 {
-  
+pub fn read_u8(bytes: &mut &[u8]) -> Result<u8, Error> {
+    let buf = read_bytes(bytes, 1)?;
+    Ok(buf[0])
 }
 
-fn read_amount(transaction_bytes: &mut &[u8]) -> Result<Amount, Error> {
-
+pub fn read_u16_le(bytes: &mut &[u8]) -> Result<u16, Error> {
+    let buf = read_bytes(bytes, 2)?;
+    Ok(u16::from_le_bytes([buf[0], buf[1]]))
 }
 
-
-
-fn read_u32(bytes_slice: &mut &[u8]) ->Result<u32, Error> {}
-  
-
-
-fn read_compact_size(transaction_bytes: &mut &[u8]) -> Result<u64, Error> {
-
- 
+pub fn read_u32(bytes_slice: &mut &[u8]) -> Result<u32, Error> {
+    let buf = read_bytes(bytes_slice, 4)?;
+    Ok(u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]))
 }
 
-fn read_txid(transaction_bytes: &mut &[u8]) -> Result<Txid, Error> {
-  
+pub fn read_version_byte(transaction_bytes: &mut &[u8]) -> Result<u32, Error> {
+    read_u32(transaction_bytes)
 }
 
-
-
-fn read_script_size(transaction_bytes: &mut &[u8]) -> Result<String, Error> {
-
+pub fn decode_transaction(_transaction_hex: String) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(String::new())
 }
 
-fn read_version_byte(transaction_bytes: &mut &[u8]) -> Result<u32, Error> {
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-}
-// Bitcoin uses little-endian encoding for most of its numeric fields, meaning the least significant byte comes first.
-
-fn hash_row_transaction(row_transaction_bytes: &[u8]) -> Result<Txid, Error> {
-
-
-}
-
-
-pub fn decode_transaction(transaction_hex: String) -> Result<String, Box<dyn std::error::Error>> {
-    
-
+    #[test]
+    fn test_read_u32_le() {
+        let bytes = [0x02, 0x00, 0x00, 0x00];
+        let mut slice = &bytes[..];
+        assert_eq!(read_u32(&mut slice).unwrap(), 2);
+        assert!(slice.is_empty());
+    }
 }
