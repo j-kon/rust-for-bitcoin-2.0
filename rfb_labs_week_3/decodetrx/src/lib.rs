@@ -276,15 +276,27 @@ mod tests {
         let segwit_hex = "0200000000010196277c04c986c1ad78c909287fd12dba2924324699a0232e0533f46a6a3916bb0100000000ffffffff026400000000000000160014274ae586ad2035efb4c25049c155f98310d7e106ca16440000000000160014599bcef6387256c6b019030c421b4a4d382fe2600247304402204d94a1e4047ca38a450177ccb6f88585ca147f1939df343d8ac5d962c5f35bb302206f7fa42c21c47ebccdc460393d35c5dfd3b6f0a26cf10fac23d3e6fab71835c20121020cb972a66e3fb1cdcc9efcad060b4457ebec534942700d4af1c0d82a33aa13f100000000";
         let raw_bytes = hex::decode(segwit_hex).unwrap();
 
-        // Full raw hash = wTXID
-        let wtxid = hash_raw_transaction(&raw_bytes).unwrap();
-
-        // Decoded TXID (Legacy payload hash)
+        // 1. Decoded TXID (legacy payload hash)
         let json_str = decode_transaction(segwit_hex.to_string()).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
         let txid_hex = parsed["transaction_id"].as_str().unwrap();
 
+        let expected_txid = "be9ea29072566edbc6827e3d9caf1d8c0b57cb0d5e74b95c721c46b3124cbe0b";
+        assert_eq!(
+            txid_hex, expected_txid,
+            "Calculated TXID must match expected TXID"
+        );
+
+        // 2. Full raw hash = wTXID
+        let wtxid = hash_raw_transaction(&raw_bytes).unwrap();
         let wtxid_hex = hex::encode(wtxid.as_bytes());
+        let expected_wtxid = "2a9241e605bca28b6347e57b1c25d2ce1581753f27f3552b26dd073658664b5e";
+        assert_eq!(
+            wtxid_hex, expected_wtxid,
+            "Calculated wTXID must match expected wTXID"
+        );
+
+        // 3. TXID != wTXID
         assert_ne!(txid_hex, wtxid_hex, "SegWit TXID must NOT equal wTXID!");
     }
 
