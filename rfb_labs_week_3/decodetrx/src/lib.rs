@@ -274,4 +274,14 @@ mod tests {
         let wtxid_hex = hex::encode(wtxid.as_bytes());
         assert_ne!(txid_hex, wtxid_hex, "SegWit TXID must NOT equal wTXID!");
     }
+
+    #[test]
+    fn test_invalid_hex_input() {
+        assert!(decode_transaction("invalid_hex_string!".into()).is_err());
+    }
+
+    #[test]
+    fn test_truncated_transaction() {
+        assert!(decode_transaction("020000".into()).is_err());
+    }
 }
