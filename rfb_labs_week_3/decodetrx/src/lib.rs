@@ -44,6 +44,11 @@ pub fn read_amount(transaction_bytes: &mut &[u8]) -> Result<transaction::Amount,
     Ok(transaction::Amount::from_sat(sat))
 }
 
+/// Parses a Bitcoin CompactSize variable-length integer.
+/// - 0x00..=0xfc: single u8 byte value
+/// - 0xfd: next 2 bytes as little-endian u16
+/// - 0xfe: next 4 bytes as little-endian u32
+/// - 0xff: next 8 bytes as little-endian u64
 pub fn read_compact_size(transaction_bytes: &mut &[u8]) -> Result<u64, Error> {
     let n = read_u8(transaction_bytes)?;
     match n {
@@ -90,6 +95,8 @@ pub fn read_version_byte(transaction_bytes: &mut &[u8]) -> Result<u32, Error> {
     read_u32(transaction_bytes)
 }
 
+/// Computes the double SHA-256 hash (`sha256d`) over the input byte slice.
+/// Reverses the resulting 32-byte digest so it produces Big-Endian display order hex.
 pub fn hash_raw_transaction(raw_transaction_bytes: &[u8]) -> Result<transaction::Txid, Error> {
     use sha2::{Digest, Sha256};
     let first_hash = Sha256::digest(raw_transaction_bytes);
