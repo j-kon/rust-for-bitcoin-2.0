@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod compactsize;
 pub mod parser;
 pub mod serializer;
