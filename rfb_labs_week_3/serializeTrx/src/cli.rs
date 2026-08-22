@@ -1,8 +1,8 @@
-use clap::Parser;
 use crate::parser::{parse_input_str, parse_output_str, parse_witness_str};
 use crate::serializer::serialize_transaction;
 use crate::transaction::Transaction;
 use crate::utils::bytes_to_hex;
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -37,30 +37,32 @@ pub struct Cli {
 
 pub fn build_transaction_from_cli(cli: Cli) -> Result<Transaction, String> {
     if cli.inputs.is_empty() {
-        return Err("transaction must contain at least one input specification (--input)".to_string());
+        return Err(
+            "transaction must contain at least one input specification (--input)".to_string(),
+        );
     }
     if cli.outputs.is_empty() {
-        return Err("transaction must contain at least one output specification (--output)".to_string());
+        return Err(
+            "transaction must contain at least one output specification (--output)".to_string(),
+        );
     }
 
     let mut inputs = Vec::with_capacity(cli.inputs.len());
     for (idx, input_str) in cli.inputs.iter().enumerate() {
-        let input = parse_input_str(input_str)
-            .map_err(|e| format!("invalid input #{idx}: {e}"))?;
+        let input = parse_input_str(input_str).map_err(|e| format!("invalid input #{idx}: {e}"))?;
         inputs.push(input);
     }
 
     let mut outputs = Vec::with_capacity(cli.outputs.len());
     for (idx, output_str) in cli.outputs.iter().enumerate() {
-        let output = parse_output_str(output_str)
-            .map_err(|e| format!("invalid output #{idx}: {e}"))?;
+        let output =
+            parse_output_str(output_str).map_err(|e| format!("invalid output #{idx}: {e}"))?;
         outputs.push(output);
     }
 
     if !cli.segwit && !cli.witnesses.is_empty() {
         return Err(
-            "witness data (--witness) cannot be supplied for a non-SegWit transaction"
-                .to_string(),
+            "witness data (--witness) cannot be supplied for a non-SegWit transaction".to_string(),
         );
     }
 
@@ -156,8 +158,10 @@ mod tests {
             version: 2,
             segwit: true,
             inputs: vec![
-                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff".to_string(),
-                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:1::ffffffff".to_string(),
+                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff"
+                    .to_string(),
+                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:1::ffffffff"
+                    .to_string(),
             ],
             outputs: vec![
                 "50000:0014a632c1fff47af29f8c81dc4c6e91eb49a116c12b".to_string(),
@@ -196,7 +200,10 @@ mod tests {
         let cli_no_output = Cli {
             version: 1,
             segwit: false,
-            inputs: vec!["21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff".to_string()],
+            inputs: vec![
+                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff"
+                    .to_string(),
+            ],
             outputs: vec![],
             witnesses: vec![],
             locktime: 0,
@@ -207,7 +214,10 @@ mod tests {
         let cli_witness_legacy = Cli {
             version: 1,
             segwit: false,
-            inputs: vec!["21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff".to_string()],
+            inputs: vec![
+                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff"
+                    .to_string(),
+            ],
             outputs: vec!["50000:0014a6".to_string()],
             witnesses: vec!["0:3045".to_string()],
             locktime: 0,
@@ -218,7 +228,10 @@ mod tests {
         let cli_witness_oob = Cli {
             version: 2,
             segwit: true,
-            inputs: vec!["21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff".to_string()],
+            inputs: vec![
+                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff"
+                    .to_string(),
+            ],
             outputs: vec!["50000:0014a6".to_string()],
             witnesses: vec!["5:3045".to_string()],
             locktime: 0,

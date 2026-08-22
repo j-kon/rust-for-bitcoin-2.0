@@ -9,7 +9,10 @@ pub fn parse_u32_int_or_hex(val: &str, field_name: &str) -> Result<u32, String> 
     if let Some(hex_part) = v.strip_prefix("0x").or_else(|| v.strip_prefix("0X")) {
         u32::from_str_radix(hex_part, 16)
             .map_err(|e| format!("{field_name} must be a valid u32 integer or hex: {e}"))
-    } else if v.len() == 8 && v.chars().any(|c| c.is_ascii_hexdigit() && !c.is_ascii_digit()) {
+    } else if v.len() == 8
+        && v.chars()
+            .any(|c| c.is_ascii_hexdigit() && !c.is_ascii_digit())
+    {
         u32::from_str_radix(v, 16)
             .map_err(|e| format!("{field_name} must be a valid u32 integer or hex: {e}"))
     } else {
@@ -78,8 +81,12 @@ pub fn parse_witness_str(s: &str) -> Result<(usize, Vec<u8>), String> {
         .trim()
         .parse::<usize>()
         .map_err(|e| format!("invalid witness input index '{}': {e}", parts[0]))?;
-    let item_bytes = hex::decode(parts[1])
-        .map_err(|e| format!("invalid witness item hexadecimal string '{}': {e}", parts[1]))?;
+    let item_bytes = hex::decode(parts[1]).map_err(|e| {
+        format!(
+            "invalid witness item hexadecimal string '{}': {e}",
+            parts[1]
+        )
+    })?;
 
     Ok((input_index, item_bytes))
 }
@@ -90,7 +97,8 @@ mod tests {
 
     #[test]
     fn test_parse_input_str_valid() {
-        let input_str = "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:1::ffffffff";
+        let input_str =
+            "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:1::ffffffff";
         let input = parse_input_str(input_str).unwrap();
         assert_eq!(input.vout, 1);
         assert_eq!(input.sequence, 0xffffffff);

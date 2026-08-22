@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use clap::Parser;
 use serializeTrx::cli::{run_cli_args, Cli};
 use std::process::ExitCode;
