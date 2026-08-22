@@ -149,4 +149,80 @@ mod tests {
         assert_eq!(cli_len, expected_bytes.len());
         assert_eq!(cli_len, 223);
     }
+
+    #[test]
+    fn test_multi_input_multi_output_cli() {
+        let cli = Cli {
+            version: 2,
+            segwit: true,
+            inputs: vec![
+                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff".to_string(),
+                "21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:1::ffffffff".to_string(),
+            ],
+            outputs: vec![
+                "50000:0014a632c1fff47af29f8c81dc4c6e91eb49a116c12b".to_string(),
+                "25000:00149831122b93d21715c70db626ccc844d3c21f9687".to_string(),
+            ],
+            witnesses: vec![
+                "0:3045022100f8".to_string(),
+                "0:029cbb1e".to_string(),
+                "1:3044022011".to_string(),
+                "1:03aabbcc".to_string(),
+            ],
+            locktime: 0,
+        };
+
+        let trx = build_transaction_from_cli(cli).unwrap();
+        assert_eq!(trx.inputs.len(), 2);
+        assert_eq!(trx.outputs.len(), 2);
+        assert_eq!(trx.inputs[0].witness.len(), 2);
+        assert_eq!(trx.inputs[1].witness.len(), 2);
+    }
+
+    #[test]
+    fn test_cli_validation_errors() {
+        // Missing inputs
+        let cli_no_input = Cli {
+            version: 1,
+            segwit: false,
+            inputs: vec![],
+            outputs: vec!["50000:0014a6".to_string()],
+            witnesses: vec![],
+            locktime: 0,
+        };
+        assert!(build_transaction_from_cli(cli_no_input).is_err());
+
+        // Missing outputs
+        let cli_no_output = Cli {
+            version: 1,
+            segwit: false,
+            inputs: vec!["21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff".to_string()],
+            outputs: vec![],
+            witnesses: vec![],
+            locktime: 0,
+        };
+        assert!(build_transaction_from_cli(cli_no_output).is_err());
+
+        // Witness on legacy
+        let cli_witness_legacy = Cli {
+            version: 1,
+            segwit: false,
+            inputs: vec!["21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff".to_string()],
+            outputs: vec!["50000:0014a6".to_string()],
+            witnesses: vec!["0:3045".to_string()],
+            locktime: 0,
+        };
+        assert!(build_transaction_from_cli(cli_witness_legacy).is_err());
+
+        // Witness out of bounds
+        let cli_witness_oob = Cli {
+            version: 2,
+            segwit: true,
+            inputs: vec!["21c80d2b05c1106360a36e435ad8e418e85d0eb708d9f2bf216476b37bd0b08f:0::ffffffff".to_string()],
+            outputs: vec!["50000:0014a6".to_string()],
+            witnesses: vec!["5:3045".to_string()],
+            locktime: 0,
+        };
+        assert!(build_transaction_from_cli(cli_witness_oob).is_err());
+    }
 }
