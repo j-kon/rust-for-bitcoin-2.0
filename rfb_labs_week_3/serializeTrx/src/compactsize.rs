@@ -21,3 +21,29 @@ pub fn encode_varint(value: usize) -> Vec<u8> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_varint_boundaries() {
+        // 0..=0xfc (1 byte)
+        assert_eq!(encode_varint(0), vec![0x00]);
+        assert_eq!(encode_varint(0xfc), vec![0xfc]);
+
+        // 0xfd..=0xffff (0xfd + 2 bytes LE)
+        assert_eq!(encode_varint(0xfd), vec![0xfd, 0xfd, 0x00]);
+        assert_eq!(encode_varint(0xffff), vec![0xfd, 0xff, 0xff]);
+
+        // 0x10000..=0xffff_ffff (0xfe + 4 bytes LE)
+        assert_eq!(encode_varint(0x10000), vec![0xfe, 0x00, 0x00, 0x01, 0x00]);
+        assert_eq!(encode_varint(0xffff_ffff), vec![0xfe, 0xff, 0xff, 0xff, 0xff]);
+
+        // > 0xffff_ffff (0xff + 8 bytes LE)
+        assert_eq!(
+            encode_varint(0x1_0000_0000),
+            vec![0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00]
+        );
+    }
+}
