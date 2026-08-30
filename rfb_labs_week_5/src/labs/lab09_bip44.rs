@@ -88,7 +88,9 @@ pub fn with_address_index(path: &str, new_index: u32) -> LabResult<String> {
     let _info = decode_bip44_path(path)?;
     let mut parts: Vec<&str> = path.split('/').collect();
     let new_idx_str = new_index.to_string();
-    let last = parts.last_mut().ok_or_else(|| LabError::InvalidPath("empty path".into()))?;
+    let last = parts
+        .last_mut()
+        .ok_or_else(|| LabError::InvalidPath("empty path".into()))?;
     *last = &new_idx_str;
     Ok(parts.join("/"))
 }

@@ -69,9 +69,27 @@ pub fn derive_address_set(
     let bip49_path = format!("m/49'/{coin}'/{account}'/0/{index}");
     let bip84_path = format!("m/84'/{coin}'/{account}'/0/{index}");
 
-    let bip44_p2pkh = derive_address_for_path(mnemonic, passphrase, &bip44_path, AddressFormat::P2pkh, network)?;
-    let bip49_p2sh_p2wpkh = derive_address_for_path(mnemonic, passphrase, &bip49_path, AddressFormat::P2sh, network)?;
-    let bip84_p2wpkh = derive_address_for_path(mnemonic, passphrase, &bip84_path, AddressFormat::P2wpkh, network)?;
+    let bip44_p2pkh = derive_address_for_path(
+        mnemonic,
+        passphrase,
+        &bip44_path,
+        AddressFormat::P2pkh,
+        network,
+    )?;
+    let bip49_p2sh_p2wpkh = derive_address_for_path(
+        mnemonic,
+        passphrase,
+        &bip49_path,
+        AddressFormat::P2sh,
+        network,
+    )?;
+    let bip84_p2wpkh = derive_address_for_path(
+        mnemonic,
+        passphrase,
+        &bip84_path,
+        AddressFormat::P2wpkh,
+        network,
+    )?;
 
     Ok(DerivedAddressSet {
         bip44_p2pkh,

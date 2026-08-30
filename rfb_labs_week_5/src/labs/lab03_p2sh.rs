@@ -17,8 +17,10 @@ fn parse_script(redeem_script_hex: &str) -> LabResult<ScriptBuf> {
 
 /// Build `2 <pub1> <pub2> <pub3> 3 OP_CHECKMULTISIG`.
 pub fn build_2_of_3_redeem_script(public_keys: [&str; 3]) -> LabResult<String> {
-    let pks: Result<Vec<PublicKey>, _> = public_keys.iter().map(|s| PublicKey::from_str(s)).collect();
-    let pks = pks.map_err(|e| LabError::InvalidKey(format!("invalid public key in 2-of-3 multisig: {e}")))?;
+    let pks: Result<Vec<PublicKey>, _> =
+        public_keys.iter().map(|s| PublicKey::from_str(s)).collect();
+    let pks = pks
+        .map_err(|e| LabError::InvalidKey(format!("invalid public key in 2-of-3 multisig: {e}")))?;
 
     let script = Builder::new()
         .push_int(2)

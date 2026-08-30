@@ -53,9 +53,7 @@ pub fn inspect_address(address_str: &str, network: Network) -> LabResult<Address
         .map_err(|e| LabError::InvalidAddress(format!("failed to parse address: {e}")))?;
 
     let checked_addr = unchecked_addr.require_network(network).map_err(|e| {
-        LabError::WrongNetwork(format!(
-            "address network mismatch for '{address_str}': {e}"
-        ))
+        LabError::WrongNetwork(format!("address network mismatch for '{address_str}': {e}"))
     })?;
 
     let format = match checked_addr.address_type() {
