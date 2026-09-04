@@ -1,13 +1,7 @@
-pub mod cli;
-pub mod commands;
-pub mod config;
-pub mod error;
-pub mod node;
-pub mod wallet;
-
 use clap::Parser;
-use cli::{Cli, Commands};
-use config::AppConfig;
+use rfb_labs_week_6::cli::{Cli, Commands};
+use rfb_labs_week_6::commands;
+use rfb_labs_week_6::config::AppConfig;
 
 fn main() {
     let cli = Cli::parse();
