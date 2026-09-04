@@ -19,7 +19,7 @@ Your wallet must be able to:
 
 # Week 6 Bitcoin Wallet
 
-A modular, descriptor-based Bitcoin CLI wallet operating on **Regtest**, built using the modern Rust Bitcoin ecosystem (`bdk_wallet`, `bdk_bitcoind_rpc`, `bitcoincore-rpc`, `rust-bitcoin`, and SQLite).
+A functional descriptor-based Regtest CLI wallet with real Bitcoin Core integration, built using the modern Rust Bitcoin ecosystem (`bdk_wallet`, `bdk_bitcoind_rpc`, `bitcoincore-rpc`, `rust-bitcoin`, and SQLite).
 
 ## Features
 
@@ -171,7 +171,11 @@ cargo fmt --check
 
 ---
 
-## CLI Usage Walkthrough
+## CLI Usage Walkthrough (Illustrative Examples)
+
+> [!NOTE]
+> The outputs in this section illustrate general command syntax and sample schema formatting.
+> For full, actual evidence with genuine transaction IDs from an active Regtest node, see the [Verified Live Regtest Proof](#verified-live-regtest-proof) section below.
 
 ### 1. Initialize Wallet
 Generates fresh disposable key material, constructs BIP84 descriptors, initializes the database, and persists the wallet state:
@@ -334,41 +338,107 @@ cargo test --test persistence_tests
 
 ---
 
-## Working Transaction Proof
+## Verified Live Regtest Proof
 
-> [!NOTE]
-> **End-to-end broadcast proof pending local regtest execution.**
-> As noted during environmental inspection, no local `bitcoind` daemon is currently running on this machine.
-> In adherence to the assignment guidelines, no transaction IDs or broadcast proofs have been fabricated.
+> [!IMPORTANT]
+> **Verified Live Regtest Execution Evidence**
+> The following proof was captured live from an active, isolated **Regtest** node running Bitcoin Core **v29.2.0** via Docker (`btcpayserver/bitcoin:29.2`). No real funds, mainnet, or fabricated identifiers were used.
 
-### Step-by-Step Instructions to Run Live Regtest Proof:
-Once you launch a regtest node (see [Bitcoin Core Regtest Setup](#bitcoin-core-regtest-setup)), run:
+### 1. Environment & Node State
+- **Network**: `regtest` (strictly enforced, isolated local environment)
+- **Bitcoin Core Version**: `/Satoshi:29.2.0/` (RPC port: `18443`)
+- **Initial Block Height**: 0
+
+### 2. Receiving Address & Initial Funding Workflow
+- **Wallet Initialization**: Fresh wallet initialized into `./data/wallet.sqlite`.
+- **First External Receiving Address** (index 0): `bcrt1qn7va4jyft5sntpfxrugvud69ymz9pslnvgf3f6`
+- **First Internal Change Address** (index 0): `bcrt1qgcnvly7kgc0aldx3z82q9ezntu7359tmdrpmsz`
+- **Coinbase Funding**: Mined 101 blocks directly to `bcrt1qn7va4jyft5sntpfxrugvud69ymz9pslnvgf3f6` using Bitcoin Core as a faucet.
+- **Initial Sync Result**:
+  - Blocks Scanned & Applied: 101
+  - Wallet Tip Height: 0 -> 101
+  - Best Block Hash: `3bf17202acc7cf05c96e38f8a07eee70129d8971b492817c9c6967eaf44a0688`
+
+### 3. Wallet Balance & UTXO State Before Spend
+- **Confirmed Balance**: `10000000000` sats (100 BTC from Blocks 1 and 2 reaching 100-block coinbase maturity)
+- **Immature Balance**: `495000000000` sats (99 coinbase outputs awaiting maturity)
+- **Total Balance**: `505000000000` sats
+- **Mature UTXO Selected for Spend**:
+  - OutPoint: `a75f55c0813d004a8e21191a455019c94b8003c81660a21ad66532c0c2c38adf:0`
+  - Value: 5,000,000,000 sats (Block 2 coinbase)
+
+### 4. Transaction Construction, Signing, and Broadcast
+- **Destination Address**: `bcrt1q2rc5005xpgrsmx8yjzm6ahed7nvkmnuw993npm` (independent address from Bitcoin Core faucet wallet `rfb_faucet`)
+- **Amount Sent**: `100000` sats
+- **Fee Rate Requested**: `2` sat/vB
+- **Actual Transaction Size**: 222 bytes (virtual size: `141` vB)
+- **Actual Network Fee**: `281` sats (effective rate: ~1.99 sat/vB)
+- **Change Output**: `4999899719` sats routed automatically to internal change address `bcrt1qgcnvly7kgc0aldx3z82q9ezntu7359tmdrpmsz`
+- **ACTUAL FULL TXID**:
+  ```text
+  66bead0ad58746eb3005c7a5e9ab3f305b8f2ae630d5f189ee32402ac94b0c01
+  ```
+
+### 5. Mempool & Block Confirmation Verification
+- **Mempool Verification**:
+  Querying `getrawmempool` immediately confirmed the transaction was accepted into the Bitcoin Core node's memory pool:
+  ```json
+  [
+    "66bead0ad58746eb3005c7a5e9ab3f305b8f2ae630d5f189ee32402ac94b0c01"
+  ]
+  ```
+- **Block Mining & Confirmation**:
+  Mined 1 block to a fresh mining address (`bcrt1q304f97u66jm2r00e3r20c456yfxzvx5gl2yt9r`).
+  - Confirmation Block Hash: `2f2690e61bdd2fc5cbd4ba224e363e1ad4d57c175550630c7a17919eabd6fca4` (height 102)
+  - Confirmations: `1`
+  - Verified via `getrawtransaction "66bead0ad58746eb3005c7a5e9ab3f305b8f2ae630d5f189ee32402ac94b0c01" true`.
+
+### 6. Post-Confirmation Resync & Balance
+Running `cargo run -- sync` updated the wallet tip to height 102:
+- **Confirmed Balance**: `14999899719` sats
+  - 5,000,000,000 sats (Block 1 mature coinbase)
+  - 5,000,000,000 sats (Block 3 newly matured coinbase at height 102)
+  - 4,999,899,719 sats (Internal change output from TXID `66bead0a...`)
+- **Immature Balance**: `490000000000` sats (98 immature coinbases)
+- **Total Balance**: `504999899719` sats (exact accounting: 505,000,000,000 initial - 100,000 sent - 281 fee)
+- **New Confirmed UTXO**:
+  `66bead0ad58746eb3005c7a5e9ab3f305b8f2ae630d5f189ee32402ac94b0c01:0` | `4999899719` sats | Keychain: `Internal` | Index: `0` | Status: `Block 102`
+
+### 7. Restart Persistence After Live Chain Activity
+Exited the Rust CLI process completely and reopened (`cargo run -- info`, `cargo run -- balance`, `cargo run -- utxos`):
+- Next external address index remained advanced at `2`.
+- Next internal address index remained advanced at `1`.
+- Local chain tip height remained at `102` with hash `2f2690e61bdd2fc5cbd4ba224e363e1ad4d57c175550630c7a17919eabd6fca4`.
+- Confirmed balance remained `14999899719` sats without requiring another blockchain synchronization.
+
+### Step-by-Step Instructions to Reproduce Live Regtest Proof:
 ```bash
-# 1. Initialize wallet
+# 1. Initialize fresh wallet
 cargo run -- init
 
 # 2. Get receiving address
 RECV_ADDR=$(cargo run -- new-address | grep "Address:" | awk '{print $2}')
-echo "Receiver: $RECV_ADDR"
 
-# 3. Fund address using Bitcoin Core test faucet
-bitcoin-cli -regtest -rpcuser=regtest_user -rpcpassword=regtest_password generatetoaddress 101 $RECV_ADDR
+# 3. Fund address using Bitcoin Core test faucet (101 blocks for coinbase maturity)
+bitcoin-cli -regtest -rpcuser=rfb_regtest -rpcpassword=rfb_regtest_only generatetoaddress 101 $RECV_ADDR
 
 # 4. Sync wallet and check balance
 cargo run -- sync
 cargo run -- balance
 cargo run -- utxos
 
-# 5. Generate another address to send to
-DEST_ADDR=$(bitcoin-cli -regtest -rpcuser=regtest_user -rpcpassword=regtest_password getnewaddress)
+# 5. Generate independent destination address
+DEST_ADDR=$(bitcoin-cli -regtest -rpcuser=rfb_regtest -rpcpassword=rfb_regtest_only -rpcwallet=rfb_faucet getnewaddress)
 
 # 6. Send funds with our Rust wallet
 cargo run -- send --to $DEST_ADDR --amount 100000 --fee-rate 2
 
 # 7. Mine a block and verify confirmation
-bitcoin-cli -regtest -rpcuser=regtest_user -rpcpassword=regtest_password generatetoaddress 1 $DEST_ADDR
+MINING_ADDR=$(bitcoin-cli -regtest -rpcuser=rfb_regtest -rpcpassword=rfb_regtest_only -rpcwallet=rfb_faucet getnewaddress)
+bitcoin-cli -regtest -rpcuser=rfb_regtest -rpcpassword=rfb_regtest_only generatetoaddress 1 $MINING_ADDR
 cargo run -- sync
 cargo run -- balance
+cargo run -- utxos
 ```
 
 ---
@@ -393,7 +463,7 @@ cargo run --example raw_tx_comparison
 ## Known Limitations
 
 1. **Fee Estimation**: Default feerate is fixed at 1 sat/vB unless passed via `--fee-rate`. Dynamic feerate estimation via `estimatesmartfee` is not yet hooked up.
-2. **Key Storage Encryption**: Private descriptors in `./data/wallet.sqlite` (`_wallet_secrets`) are stored unencrypted in local SQLite with filesystem permissions. Production wallets should encrypt private keys using PBKDF2/Argon2 + ChaCha20Poly1305.
+2. **Key Storage Encryption**: Private descriptors in `./data/wallet.sqlite` (`_wallet_secrets`) are stored locally in plaintext SQLite with standard file permissions. Production wallet software should encrypt and protect signing material more strongly using robust key derivation (e.g. Argon2id) and authenticated encryption (e.g. ChaCha20-Poly1305).
 3. **Single Output Sending**: Currently supports one recipient per `send` invocation. Batch transactions (multiple outputs) are not yet exposed on the CLI.
 
 ---
