@@ -46,6 +46,15 @@ pub struct WalletSummary {
     pub tip_hash: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BalanceReport {
+    pub confirmed_sats: u64,
+    pub trusted_pending_sats: u64,
+    pub untrusted_pending_sats: u64,
+    pub immature_sats: u64,
+    pub total_sats: u64,
+}
+
 pub struct AppWallet {
     pub wallet: PersistedWallet<Connection>,
     pub conn: Connection,
@@ -248,6 +257,18 @@ impl AppWallet {
         }
     }
 
+    /// Returns detailed breakdown of wallet balances in integer satoshis.
+    pub fn get_balance(&self) -> BalanceReport {
+        let b = self.wallet.balance();
+        BalanceReport {
+            confirmed_sats: b.confirmed.to_sat(),
+            trusted_pending_sats: b.trusted_pending.to_sat(),
+            untrusted_pending_sats: b.untrusted_pending.to_sat(),
+            immature_sats: b.immature.to_sat(),
+            total_sats: b.total().to_sat(),
+        }
+    }
+
     /// Derives and persists the next external receiving address.
     pub fn new_external_address(&mut self) -> Result<GeneratedAddress, AppError> {
         let info = self.wallet.reveal_next_address(KeychainKind::External);
@@ -334,5 +355,25 @@ mod tests {
         let addr1 = reloaded.wallet.reveal_next_address(KeychainKind::External);
         assert_eq!(addr1.index, 1);
         assert_ne!(addr0.address, addr1.address);
+    }
+
+    #[test]
+    fn test_wallet_balance_initial() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path;
+
+        AppWallet::init(&config).expect("init should succeed");
+        let wallet = AppWallet::open(&config).expect("open should succeed");
+
+        let balance = wallet.get_balance();
+        assert_eq!(balance.confirmed_sats, 0);
+        assert_eq!(balance.trusted_pending_sats, 0);
+        assert_eq!(balance.untrusted_pending_sats, 0);
+        assert_eq!(balance.immature_sats, 0);
+        assert_eq!(balance.total_sats, 0);
     }
 }
