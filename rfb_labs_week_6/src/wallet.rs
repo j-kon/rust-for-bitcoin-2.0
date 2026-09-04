@@ -583,4 +583,75 @@ mod tests {
             .unwrap_err();
         assert!(matches!(err, AppError::InsufficientFunds { .. }));
     }
+
+    #[test]
+    fn test_transaction_sign_and_finalize() {
+        use bitcoin::{
+            block::{Header, Version as BlockVersion},
+            hashes::Hash,
+            transaction::Version as TxVersion,
+            absolute::LockTime,
+            Block, CompactTarget, OutPoint, ScriptBuf, Sequence, TxIn, TxMerkleNode, TxOut, Witness,
+        };
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path;
+
+        AppWallet::init(&config).expect("init should succeed");
+        let mut wallet = AppWallet::open(&config).expect("open should succeed");
+
+        let receiving_addr = wallet.new_external_address().unwrap().address;
+        let funding_tx = bitcoin::Transaction {
+            version: TxVersion::TWO,
+            lock_time: LockTime::ZERO,
+            input: vec![TxIn {
+                previous_output: OutPoint {
+                    txid: Hash::all_zeros(),
+                    vout: 1,
+                },
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::MAX,
+                witness: Witness::new(),
+            }],
+            output: vec![TxOut {
+                value: Amount::from_sat(100_000),
+                script_pubkey: receiving_addr.script_pubkey(),
+            }],
+        };
+
+        let block = Block {
+            header: Header {
+                version: BlockVersion::from_consensus(1),
+                prev_blockhash: wallet.wallet.latest_checkpoint().hash(),
+                merkle_root: TxMerkleNode::all_zeros(),
+                time: 1700000000,
+                bits: CompactTarget::from_consensus(0x207fffff),
+                nonce: 0,
+            },
+            txdata: vec![funding_tx],
+        };
+
+        wallet.wallet.apply_block(&block, 1).expect("apply block");
+        wallet.persist().expect("persist");
+
+        assert_eq!(wallet.get_balance().confirmed_sats, 100_000);
+        assert_eq!(wallet.get_utxos().len(), 1);
+
+        let dest = wallet.new_external_address().unwrap().address.to_string();
+        let res = wallet
+            .build_and_sign_transaction(&dest, 40_000, Some(2))
+            .expect("transaction build and sign should succeed");
+
+        assert!(res.is_finalized);
+        assert_eq!(res.amount_sats, 40_000);
+        assert!(res.fee_sats > 0);
+        assert_eq!(res.tx.compute_txid(), res.txid);
+        // Verify that the transaction is fully signed: witness data is populated
+        assert!(!res.tx.input.is_empty());
+        assert!(!res.tx.input[0].witness.is_empty());
+    }
 }
