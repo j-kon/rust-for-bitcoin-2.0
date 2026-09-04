@@ -4,7 +4,7 @@ use bdk_wallet::{
     bitcoin::{
         bip32::{DerivationPath, Xpriv},
         secp256k1::Secp256k1,
-        Network,
+        Address, Amount, FeeRate, Network,
     },
     rusqlite::{named_params, Connection},
     KeychainKind, Wallet,
@@ -65,6 +65,16 @@ pub struct UtxoEntry {
     pub derivation_index: u32,
     pub is_confirmed: bool,
     pub confirmation_height: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TransactionBuildResult {
+    pub tx: bdk_wallet::bitcoin::Transaction,
+    pub txid: bdk_wallet::bitcoin::Txid,
+    pub fee_sats: u64,
+    pub recipient: bdk_wallet::bitcoin::Address,
+    pub amount_sats: u64,
+    pub is_finalized: bool,
 }
 
 pub struct AppWallet {
@@ -330,6 +340,74 @@ impl AppWallet {
             network: self.wallet.network(),
         })
     }
+
+    /// Constructs, signs, and finalizes a transaction using wallet UTXOs.
+    pub fn build_and_sign_transaction(
+        &mut self,
+        recipient_address_str: &str,
+        amount_sats: u64,
+        fee_rate_sat_per_vb: Option<u64>,
+    ) -> Result<TransactionBuildResult, AppError> {
+        if amount_sats == 0 {
+            return Err(AppError::ZeroAmount);
+        }
+
+        let unchecked_addr = Address::from_str(recipient_address_str)
+            .map_err(|e| AppError::InvalidAddress {
+                address: recipient_address_str.to_string(),
+                reason: e.to_string(),
+            })?;
+
+        let recipient_address = unchecked_addr
+            .require_network(self.wallet.network())
+            .map_err(|e| AppError::AddressNetworkMismatch {
+                address: recipient_address_str.to_string(),
+                expected: self.wallet.network().to_string(),
+                actual: e.to_string(),
+            })?;
+
+        let feerate = FeeRate::from_sat_per_vb(fee_rate_sat_per_vb.unwrap_or(1))
+            .ok_or_else(|| AppError::SigningError("Invalid fee rate".to_string()))?;
+
+        let mut tx_builder = self.wallet.build_tx();
+        tx_builder.add_recipient(recipient_address.script_pubkey(), Amount::from_sat(amount_sats));
+        tx_builder.fee_rate(feerate);
+
+        let mut psbt = tx_builder.finish().map_err(|err| match err {
+            bdk_wallet::error::CreateTxError::CoinSelection(err) => AppError::InsufficientFunds {
+                needed: err.needed.to_sat(),
+                available: err.available.to_sat(),
+            },
+            other => AppError::SigningError(format!("Transaction construction failed: {other}")),
+        })?;
+
+        let fee_sats = psbt.fee().map(|f| f.to_sat()).unwrap_or(0);
+
+        let finalized = self
+            .wallet
+            .sign(&mut psbt, bdk_wallet::SignOptions::default())
+            .map_err(|e| AppError::SigningError(e.to_string()))?;
+
+        if !finalized {
+            return Err(AppError::TransactionNotFinalized);
+        }
+
+        let tx = psbt
+            .extract_tx()
+            .map_err(|e| AppError::SigningError(format!("Failed to extract finalized transaction: {e}")))?;
+        let txid = tx.compute_txid();
+
+        self.persist()?;
+
+        Ok(TransactionBuildResult {
+            tx,
+            txid,
+            fee_sats,
+            recipient: recipient_address,
+            amount_sats,
+            is_finalized: finalized,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -429,5 +507,80 @@ mod tests {
 
         let utxos = wallet.get_utxos();
         assert!(utxos.is_empty());
+    }
+
+    #[test]
+    fn test_transaction_zero_amount() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path;
+
+        AppWallet::init(&config).expect("init should succeed");
+        let mut wallet = AppWallet::open(&config).expect("open should succeed");
+
+        let err = wallet
+            .build_and_sign_transaction("bcrt1qqqsyqcyq5rqwzqfpg9mffdx22kf3702xz78rpm", 0, None)
+            .unwrap_err();
+        assert!(matches!(err, AppError::ZeroAmount));
+    }
+
+    #[test]
+    fn test_transaction_invalid_address() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path;
+
+        AppWallet::init(&config).expect("init should succeed");
+        let mut wallet = AppWallet::open(&config).expect("open should succeed");
+
+        let err = wallet
+            .build_and_sign_transaction("invalid_not_an_address", 1000, None)
+            .unwrap_err();
+        assert!(matches!(err, AppError::InvalidAddress { .. }));
+    }
+
+    #[test]
+    fn test_transaction_mainnet_address_rejected() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path;
+
+        AppWallet::init(&config).expect("init should succeed");
+        let mut wallet = AppWallet::open(&config).expect("open should succeed");
+
+        // Valid mainnet bech32 address
+        let mainnet_addr = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+        let err = wallet
+            .build_and_sign_transaction(mainnet_addr, 1000, None)
+            .unwrap_err();
+        assert!(matches!(err, AppError::AddressNetworkMismatch { .. }));
+    }
+
+    #[test]
+    fn test_transaction_insufficient_funds() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path;
+
+        AppWallet::init(&config).expect("init should succeed");
+        let mut wallet = AppWallet::open(&config).expect("open should succeed");
+
+        let regtest_dest = wallet.new_external_address().unwrap().address.to_string();
+        let err = wallet
+            .build_and_sign_transaction(&regtest_dest, 10_000, Some(1))
+            .unwrap_err();
+        assert!(matches!(err, AppError::InsufficientFunds { .. }));
     }
 }
