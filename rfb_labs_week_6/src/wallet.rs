@@ -14,8 +14,11 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use std::str::FromStr;
 
+use bdk_wallet::PersistedWallet;
+
 pub const SECRETS_TABLE_NAME: &str = "_wallet_secrets";
 
+#[derive(Debug, Clone)]
 pub struct WalletInitResult {
     pub db_path: String,
     pub network: Network,
@@ -24,7 +27,7 @@ pub struct WalletInitResult {
 }
 
 pub struct AppWallet {
-    pub wallet: Wallet,
+    pub wallet: PersistedWallet<Connection>,
     pub conn: Connection,
     pub external_descriptor: String,
     pub internal_descriptor: String,
@@ -133,5 +136,102 @@ impl AppWallet {
             external_descriptor_public: ext_pub,
             internal_descriptor_public: int_pub,
         })
+    }
+
+    /// Opens and loads an existing persisted wallet from SQLite.
+    pub fn open(config: &AppConfig) -> Result<Self, AppError> {
+        if !config.db_path.exists() {
+            return Err(AppError::WalletNotInitialized);
+        }
+
+        let mut conn = Connection::open(&config.db_path)
+            .map_err(|e| AppError::Persistence(format!("Failed to open SQLite database: {e}")))?;
+
+        // Retrieve private descriptors from secrets table
+        let (external_descriptor, internal_descriptor, stored_network): (String, String, String) = {
+            let mut stmt = conn
+                .prepare(&format!(
+                    "SELECT external_desc, internal_desc, network FROM {SECRETS_TABLE_NAME} WHERE id = 0"
+                ))
+                .map_err(|_| AppError::WalletNotInitialized)?;
+
+            stmt.query_row([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })
+            .map_err(|_| AppError::WalletNotInitialized)?
+        };
+
+        let network = AppConfig::parse_and_validate_network(&stored_network)?;
+        if network != config.network {
+            return Err(AppError::NetworkMismatch {
+                node_network: stored_network,
+                expected_network: config.network.to_string(),
+            });
+        }
+
+        let wallet_opt = Wallet::load()
+            .descriptor(KeychainKind::External, Some(external_descriptor.clone()))
+            .descriptor(KeychainKind::Internal, Some(internal_descriptor.clone()))
+            .extract_keys()
+            .check_network(config.network)
+            .load_wallet(&mut conn)
+            .map_err(|e| AppError::Persistence(format!("Failed to load BDK wallet: {e}")))?;
+
+        let wallet = wallet_opt.ok_or(AppError::WalletNotInitialized)?;
+
+        Ok(Self {
+            wallet,
+            conn,
+            external_descriptor,
+            internal_descriptor,
+        })
+    }
+
+    /// Persists wallet changeset to SQLite.
+    pub fn persist(&mut self) -> Result<bool, AppError> {
+        self.wallet
+            .persist(&mut self.conn)
+            .map_err(|e| AppError::Persistence(format!("Failed to persist wallet: {e}")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_wallet_init_and_reopen() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        // remove the empty file so init can create fresh
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path.clone();
+
+        // 1. Initial init
+        let init_res = AppWallet::init(&config).expect("init should succeed");
+        assert!(init_res.external_descriptor_public.contains("wpkh"));
+        assert!(init_res.internal_descriptor_public.contains("wpkh"));
+
+        // 2. Cannot init again
+        let err = AppWallet::init(&config).unwrap_err();
+        assert!(matches!(err, AppError::WalletAlreadyInitialized(_)));
+
+        // 3. Reopen existing wallet
+        let mut loaded = AppWallet::open(&config).expect("open should succeed");
+        assert_eq!(loaded.wallet.network(), Network::Regtest);
+
+        // 4. Reveal addresses and persist
+        let addr0 = loaded.wallet.reveal_next_address(KeychainKind::External);
+        assert_eq!(addr0.index, 0);
+        loaded.persist().expect("persist should succeed");
+
+        // 5. Reopen again and check index continuity
+        let mut reloaded = AppWallet::open(&config).expect("second open should succeed");
+        let addr1 = reloaded.wallet.reveal_next_address(KeychainKind::External);
+        assert_eq!(addr1.index, 1);
+        assert_ne!(addr0.address, addr1.address);
     }
 }
