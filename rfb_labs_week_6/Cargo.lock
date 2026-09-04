@@ -93,11 +93,11 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "bdk_bitcoind_rpc"
-version = "0.22.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99a9a7a93a0c377d1858263122afe0565e6b38800fe39b2025f217e01f146294"
+checksum = "f96e987f8736f34c1628743684f66b31faeda72f3bc86b60314197f2d8cb9731"
 dependencies = [
- "bdk_core 0.6.3",
+ "bdk_core",
  "bitcoin",
  "bitcoincore-rpc",
 ]
@@ -108,7 +108,7 @@ version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4955734f97b2baed3f36d16ae7c203fdde31ae85391ac44ee3cbcaf0886db5ce"
 dependencies = [
- "bdk_core 0.4.1",
+ "bdk_core",
  "bitcoin",
  "miniscript",
  "rusqlite",
@@ -124,15 +124,6 @@ dependencies = [
  "bitcoin",
  "hashbrown",
  "serde",
-]
-
-[[package]]
-name = "bdk_core"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb3028782f6bf14a6df987244333d34e6b272b5a40a53e4879ec2dfd82275a3a"
-dependencies = [
- "bitcoin",
 ]
 
 [[package]]

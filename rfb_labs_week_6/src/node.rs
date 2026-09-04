@@ -1,5 +1,6 @@
 use crate::config::AppConfig;
 use crate::error::AppError;
+use crate::wallet::AppWallet;
 use bdk_bitcoind_rpc::bitcoincore_rpc::{Auth, Client, RpcApi};
 use bitcoin::{Network, Transaction};
 use bitcoincore_rpc::bitcoincore_rpc_json::GetBlockchainInfoResult;
@@ -7,6 +8,15 @@ use bitcoincore_rpc::bitcoincore_rpc_json::GetBlockchainInfoResult;
 pub struct NodeClient {
     client: Client,
     url: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncResult {
+    pub start_height: u32,
+    pub end_height: u32,
+    pub blocks_applied: usize,
+    pub mempool_txs_applied: usize,
+    pub best_block_hash: String,
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +106,55 @@ impl NodeClient {
         self.client.send_raw_transaction(tx).map_err(|err| {
             let err_str = err.to_string();
             AppError::BroadcastRejected(err_str)
+        })
+    }
+
+    /// Synchronizes the wallet against Bitcoin Core using the bdk_bitcoind_rpc emitter.
+    pub fn sync(&self, wallet: &mut AppWallet) -> Result<SyncResult, AppError> {
+        self.check_connection(wallet.wallet.network())?;
+
+        let last_cp = wallet.wallet.latest_checkpoint();
+        let start_height = last_cp.height();
+
+        let mut emitter = bdk_bitcoind_rpc::Emitter::new(&self.client, last_cp, start_height);
+
+        let mut blocks_applied = 0;
+        while let Some(block_event) = emitter
+            .next_block()
+            .map_err(|e| AppError::SyncError(format!("Failed to retrieve block: {e}")))?
+        {
+            wallet
+                .wallet
+                .apply_block_connected_to(
+                    &block_event.block,
+                    block_event.block_height(),
+                    block_event.connected_to(),
+                )
+                .map_err(|e| {
+                    AppError::SyncError(format!(
+                        "Failed to apply block at height {}: {e}",
+                        block_event.block_height()
+                    ))
+                })?;
+            blocks_applied += 1;
+        }
+
+        let mempool_txs = emitter
+            .mempool()
+            .map_err(|e| AppError::SyncError(format!("Failed to retrieve mempool: {e}")))?;
+        let mempool_count = mempool_txs.len();
+        wallet.wallet.apply_unconfirmed_txs(mempool_txs);
+
+        wallet.persist()?;
+
+        let tip = wallet.wallet.latest_checkpoint();
+
+        Ok(SyncResult {
+            start_height,
+            end_height: tip.height(),
+            blocks_applied,
+            mempool_txs_applied: mempool_count,
+            best_block_hash: tip.hash().to_string(),
         })
     }
 }
