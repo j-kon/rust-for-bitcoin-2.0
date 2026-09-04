@@ -1,0 +1,15 @@
+# Runtime data and SQLite databases
+data/
+*.sqlite
+*.sqlite3
+wallet.db
+wallet.secret
+*.secret
+
+# Environment variables containing credentials
+.env
+.env.*
+!.env.example
+
+# Temporary test files
+*.tmp
