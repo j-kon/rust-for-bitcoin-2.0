@@ -26,6 +26,14 @@ pub struct WalletInitResult {
     pub internal_descriptor_public: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct GeneratedAddress {
+    pub address: bdk_wallet::bitcoin::Address,
+    pub index: u32,
+    pub keychain: KeychainKind,
+    pub network: Network,
+}
+
 pub struct AppWallet {
     pub wallet: PersistedWallet<Connection>,
     pub conn: Connection,
@@ -192,6 +200,18 @@ impl AppWallet {
         self.wallet
             .persist(&mut self.conn)
             .map_err(|e| AppError::Persistence(format!("Failed to persist wallet: {e}")))
+    }
+
+    /// Derives and persists the next external receiving address.
+    pub fn new_external_address(&mut self) -> Result<GeneratedAddress, AppError> {
+        let info = self.wallet.reveal_next_address(KeychainKind::External);
+        self.persist()?;
+        Ok(GeneratedAddress {
+            address: info.address,
+            index: info.index,
+            keychain: KeychainKind::External,
+            network: self.wallet.network(),
+        })
     }
 }
 
