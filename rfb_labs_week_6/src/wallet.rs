@@ -34,11 +34,24 @@ pub struct GeneratedAddress {
     pub network: Network,
 }
 
+#[derive(Debug, Clone)]
+pub struct WalletSummary {
+    pub db_path: String,
+    pub network: Network,
+    pub external_descriptor_public: String,
+    pub internal_descriptor_public: String,
+    pub next_external_index: u32,
+    pub next_internal_index: u32,
+    pub tip_height: u32,
+    pub tip_hash: String,
+}
+
 pub struct AppWallet {
     pub wallet: PersistedWallet<Connection>,
     pub conn: Connection,
     pub external_descriptor: String,
     pub internal_descriptor: String,
+    pub db_path: String,
 }
 
 impl AppWallet {
@@ -192,6 +205,7 @@ impl AppWallet {
             conn,
             external_descriptor,
             internal_descriptor,
+            db_path: config.db_path.display().to_string(),
         })
     }
 
@@ -200,6 +214,38 @@ impl AppWallet {
         self.wallet
             .persist(&mut self.conn)
             .map_err(|e| AppError::Persistence(format!("Failed to persist wallet: {e}")))
+    }
+
+    /// Returns high-level public summary information about the wallet.
+    pub fn get_summary(&self) -> WalletSummary {
+        let cp = self.wallet.latest_checkpoint();
+        let next_ext = self
+            .wallet
+            .derivation_index(KeychainKind::External)
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let next_int = self
+            .wallet
+            .derivation_index(KeychainKind::Internal)
+            .map(|i| i + 1)
+            .unwrap_or(0);
+
+        WalletSummary {
+            db_path: self.db_path.clone(),
+            network: self.wallet.network(),
+            external_descriptor_public: self
+                .wallet
+                .public_descriptor(KeychainKind::External)
+                .to_string(),
+            internal_descriptor_public: self
+                .wallet
+                .public_descriptor(KeychainKind::Internal)
+                .to_string(),
+            next_external_index: next_ext,
+            next_internal_index: next_int,
+            tip_height: cp.height(),
+            tip_hash: cp.hash().to_string(),
+        }
     }
 
     /// Derives and persists the next external receiving address.
