@@ -55,6 +55,18 @@ pub struct BalanceReport {
     pub total_sats: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UtxoEntry {
+    pub outpoint: String,
+    pub txid: String,
+    pub vout: u32,
+    pub amount_sats: u64,
+    pub keychain: KeychainKind,
+    pub derivation_index: u32,
+    pub is_confirmed: bool,
+    pub confirmation_height: Option<u32>,
+}
+
 pub struct AppWallet {
     pub wallet: PersistedWallet<Connection>,
     pub conn: Connection,
@@ -269,6 +281,32 @@ impl AppWallet {
         }
     }
 
+    /// Lists all unspent transaction outputs (UTXOs) tracked by the wallet.
+    pub fn get_utxos(&self) -> Vec<UtxoEntry> {
+        self.wallet
+            .list_unspent()
+            .map(|utxo| {
+                let (is_confirmed, height) = match utxo.chain_position {
+                    bdk_wallet::chain::ChainPosition::Confirmed { anchor, .. } => {
+                        (true, Some(anchor.block_id.height))
+                    }
+                    bdk_wallet::chain::ChainPosition::Unconfirmed { .. } => (false, None),
+                };
+
+                UtxoEntry {
+                    outpoint: utxo.outpoint.to_string(),
+                    txid: utxo.outpoint.txid.to_string(),
+                    vout: utxo.outpoint.vout,
+                    amount_sats: utxo.txout.value.to_sat(),
+                    keychain: utxo.keychain,
+                    derivation_index: utxo.derivation_index,
+                    is_confirmed,
+                    confirmation_height: height,
+                }
+            })
+            .collect()
+    }
+
     /// Derives and persists the next external receiving address.
     pub fn new_external_address(&mut self) -> Result<GeneratedAddress, AppError> {
         let info = self.wallet.reveal_next_address(KeychainKind::External);
@@ -375,5 +413,21 @@ mod tests {
         assert_eq!(balance.untrusted_pending_sats, 0);
         assert_eq!(balance.immature_sats, 0);
         assert_eq!(balance.total_sats, 0);
+    }
+
+    #[test]
+    fn test_wallet_utxos_initial() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path;
+
+        AppWallet::init(&config).expect("init should succeed");
+        let wallet = AppWallet::open(&config).expect("open should succeed");
+
+        let utxos = wallet.get_utxos();
+        assert!(utxos.is_empty());
     }
 }
