@@ -9,8 +9,10 @@ fn test_wallet_persistence_lifecycle() {
     let db_path = temp_file.path().to_path_buf();
     std::fs::remove_file(&db_path).unwrap();
 
-    let mut config = AppConfig::default();
-    config.db_path = db_path.clone();
+    let config = AppConfig {
+        db_path: db_path.clone(),
+        ..Default::default()
+    };
 
     // 1. Initial wallet initialization
     let init_res = AppWallet::init(&config).expect("initialization should succeed");
@@ -60,8 +62,10 @@ fn test_wallet_refuses_reinitialization() {
     let db_path = temp_file.path().to_path_buf();
     std::fs::remove_file(&db_path).unwrap();
 
-    let mut config = AppConfig::default();
-    config.db_path = db_path;
+    let config = AppConfig {
+        db_path,
+        ..Default::default()
+    };
 
     AppWallet::init(&config).expect("first init must succeed");
 
@@ -74,9 +78,14 @@ fn test_wallet_refuses_reinitialization() {
 
 #[test]
 fn test_uninitialized_wallet_error() {
-    let mut config = AppConfig::default();
-    config.db_path = std::path::PathBuf::from("./data/non_existent_wallet_test_12345.sqlite");
+    let config = AppConfig {
+        db_path: std::path::PathBuf::from("./data/non_existent_wallet_test_12345.sqlite"),
+        ..Default::default()
+    };
 
     let open_res = AppWallet::open(&config);
-    assert!(matches!(open_res.err(), Some(AppError::WalletNotInitialized)));
+    assert!(matches!(
+        open_res.err(),
+        Some(AppError::WalletNotInitialized)
+    ));
 }

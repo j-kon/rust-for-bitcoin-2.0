@@ -1,17 +1,17 @@
 use crate::config::AppConfig;
 use crate::error::AppError;
 use bdk_wallet::{
+    KeychainKind, Wallet,
     bitcoin::{
+        Address, Amount, FeeRate, Network,
         bip32::{DerivationPath, Xpriv},
         secp256k1::Secp256k1,
-        Address, Amount, FeeRate, Network,
     },
-    rusqlite::{named_params, Connection},
-    KeychainKind, Wallet,
+    rusqlite::{Connection, named_params},
 };
 use bip39::Mnemonic;
-use rand::rngs::OsRng;
 use rand::RngCore;
+use rand::rngs::OsRng;
 use std::str::FromStr;
 
 use bdk_wallet::PersistedWallet;
@@ -99,12 +99,12 @@ impl AppWallet {
                     [SECRETS_TABLE_NAME],
                     |row| row.get(0),
                 );
-                if let Ok(count) = table_exists {
-                    if count > 0 {
-                        return Err(AppError::WalletAlreadyInitialized(
-                            config.db_path.display().to_string(),
-                        ));
-                    }
+                if let Ok(count) = table_exists
+                    && count > 0
+                {
+                    return Err(AppError::WalletAlreadyInitialized(
+                        config.db_path.display().to_string(),
+                    ));
                 }
             }
         }
@@ -126,12 +126,12 @@ impl AppWallet {
         let int_path = DerivationPath::from_str("m/84'/1'/0'/1")
             .map_err(|e| AppError::KeyDerivation(format!("Invalid internal path: {e}")))?;
 
-        let ext_xpriv = master_xpriv
-            .derive_priv(&secp, &ext_path)
-            .map_err(|e| AppError::KeyDerivation(format!("Failed to derive external xpriv: {e}")))?;
-        let int_xpriv = master_xpriv
-            .derive_priv(&secp, &int_path)
-            .map_err(|e| AppError::KeyDerivation(format!("Failed to derive internal xpriv: {e}")))?;
+        let ext_xpriv = master_xpriv.derive_priv(&secp, &ext_path).map_err(|e| {
+            AppError::KeyDerivation(format!("Failed to derive external xpriv: {e}"))
+        })?;
+        let int_xpriv = master_xpriv.derive_priv(&secp, &int_path).map_err(|e| {
+            AppError::KeyDerivation(format!("Failed to derive internal xpriv: {e}"))
+        })?;
 
         let external_desc = format!("wpkh({}/*)", ext_xpriv);
         let internal_desc = format!("wpkh({}/*)", int_xpriv);
@@ -207,10 +207,8 @@ impl AppWallet {
                 ))
                 .map_err(|_| AppError::WalletNotInitialized)?;
 
-            stmt.query_row([], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-            })
-            .map_err(|_| AppError::WalletNotInitialized)?
+            stmt.query_row([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                .map_err(|_| AppError::WalletNotInitialized)?
         };
 
         let network = AppConfig::parse_and_validate_network(&stored_network)?;
@@ -352,8 +350,8 @@ impl AppWallet {
             return Err(AppError::ZeroAmount);
         }
 
-        let unchecked_addr = Address::from_str(recipient_address_str)
-            .map_err(|e| AppError::InvalidAddress {
+        let unchecked_addr =
+            Address::from_str(recipient_address_str).map_err(|e| AppError::InvalidAddress {
                 address: recipient_address_str.to_string(),
                 reason: e.to_string(),
             })?;
@@ -370,7 +368,10 @@ impl AppWallet {
             .ok_or_else(|| AppError::SigningError("Invalid fee rate".to_string()))?;
 
         let mut tx_builder = self.wallet.build_tx();
-        tx_builder.add_recipient(recipient_address.script_pubkey(), Amount::from_sat(amount_sats));
+        tx_builder.add_recipient(
+            recipient_address.script_pubkey(),
+            Amount::from_sat(amount_sats),
+        );
         tx_builder.fee_rate(feerate);
 
         let mut psbt = tx_builder.finish().map_err(|err| match err {
@@ -392,9 +393,9 @@ impl AppWallet {
             return Err(AppError::TransactionNotFinalized);
         }
 
-        let tx = psbt
-            .extract_tx()
-            .map_err(|e| AppError::SigningError(format!("Failed to extract finalized transaction: {e}")))?;
+        let tx = psbt.extract_tx().map_err(|e| {
+            AppError::SigningError(format!("Failed to extract finalized transaction: {e}"))
+        })?;
         let txid = tx.compute_txid();
 
         self.persist()?;
@@ -421,8 +422,10 @@ mod tests {
         let db_path = temp_file.path().to_path_buf();
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path;
+        let config = AppConfig {
+            db_path,
+            ..Default::default()
+        };
 
         AppWallet::init(&config).expect("init should succeed");
         let mut wallet = AppWallet::open(&config).expect("open should succeed");
@@ -445,8 +448,10 @@ mod tests {
         // remove the empty file so init can create fresh
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path.clone();
+        let config = AppConfig {
+            db_path: db_path.clone(),
+            ..Default::default()
+        };
 
         // 1. Initial init
         let init_res = AppWallet::init(&config).expect("init should succeed");
@@ -479,8 +484,10 @@ mod tests {
         let db_path = temp_file.path().to_path_buf();
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path;
+        let config = AppConfig {
+            db_path,
+            ..Default::default()
+        };
 
         AppWallet::init(&config).expect("init should succeed");
         let wallet = AppWallet::open(&config).expect("open should succeed");
@@ -499,8 +506,10 @@ mod tests {
         let db_path = temp_file.path().to_path_buf();
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path;
+        let config = AppConfig {
+            db_path,
+            ..Default::default()
+        };
 
         AppWallet::init(&config).expect("init should succeed");
         let wallet = AppWallet::open(&config).expect("open should succeed");
@@ -515,8 +524,10 @@ mod tests {
         let db_path = temp_file.path().to_path_buf();
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path;
+        let config = AppConfig {
+            db_path,
+            ..Default::default()
+        };
 
         AppWallet::init(&config).expect("init should succeed");
         let mut wallet = AppWallet::open(&config).expect("open should succeed");
@@ -533,8 +544,10 @@ mod tests {
         let db_path = temp_file.path().to_path_buf();
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path;
+        let config = AppConfig {
+            db_path,
+            ..Default::default()
+        };
 
         AppWallet::init(&config).expect("init should succeed");
         let mut wallet = AppWallet::open(&config).expect("open should succeed");
@@ -551,8 +564,10 @@ mod tests {
         let db_path = temp_file.path().to_path_buf();
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path;
+        let config = AppConfig {
+            db_path,
+            ..Default::default()
+        };
 
         AppWallet::init(&config).expect("init should succeed");
         let mut wallet = AppWallet::open(&config).expect("open should succeed");
@@ -571,8 +586,10 @@ mod tests {
         let db_path = temp_file.path().to_path_buf();
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path;
+        let config = AppConfig {
+            db_path,
+            ..Default::default()
+        };
 
         AppWallet::init(&config).expect("init should succeed");
         let mut wallet = AppWallet::open(&config).expect("open should succeed");
@@ -587,19 +604,22 @@ mod tests {
     #[test]
     fn test_transaction_sign_and_finalize() {
         use bitcoin::{
+            Block, CompactTarget, OutPoint, ScriptBuf, Sequence, TxIn, TxMerkleNode, TxOut,
+            Witness,
+            absolute::LockTime,
             block::{Header, Version as BlockVersion},
             hashes::Hash,
             transaction::Version as TxVersion,
-            absolute::LockTime,
-            Block, CompactTarget, OutPoint, ScriptBuf, Sequence, TxIn, TxMerkleNode, TxOut, Witness,
         };
 
         let temp_file = NamedTempFile::new().unwrap();
         let db_path = temp_file.path().to_path_buf();
         std::fs::remove_file(&db_path).unwrap();
 
-        let mut config = AppConfig::default();
-        config.db_path = db_path;
+        let config = AppConfig {
+            db_path,
+            ..Default::default()
+        };
 
         AppWallet::init(&config).expect("init should succeed");
         let mut wallet = AppWallet::open(&config).expect("open should succeed");

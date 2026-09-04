@@ -37,9 +37,11 @@ fn main() {
         Commands::Sync => commands::handle_sync(&config),
         Commands::Balance => commands::handle_balance(&config),
         Commands::Utxos => commands::handle_utxos(&config),
-        Commands::Send { to, amount, fee_rate } => {
-            commands::handle_send(&config, &to, amount, fee_rate)
-        }
+        Commands::Send {
+            to,
+            amount,
+            fee_rate,
+        } => commands::handle_send(&config, &to, amount, fee_rate),
     };
 
     if let Err(err) = result {

@@ -6,7 +6,9 @@ pub enum AppError {
     #[error("Wallet is not initialized. Please run `cargo run -- init` first.")]
     WalletNotInitialized,
 
-    #[error("Wallet is already initialized at '{0}'. Use other commands or specify a different database path.")]
+    #[error(
+        "Wallet is already initialized at '{0}'. Use other commands or specify a different database path."
+    )]
     WalletAlreadyInitialized(String),
 
     #[error("Configuration error: {0}")]
@@ -18,7 +20,9 @@ pub enum AppError {
     #[error("Bitcoin Core authentication failed. Please check RPC credentials.")]
     NodeAuthFailed,
 
-    #[error("Network mismatch: connected Bitcoin node is on '{node_network}', but wallet is configured for '{expected_network}'.")]
+    #[error(
+        "Network mismatch: connected Bitcoin node is on '{node_network}', but wallet is configured for '{expected_network}'."
+    )]
     NetworkMismatch {
         node_network: String,
         expected_network: String,
@@ -30,7 +34,9 @@ pub enum AppError {
     #[error("Invalid Bitcoin address '{address}': {reason}")]
     InvalidAddress { address: String, reason: String },
 
-    #[error("Address network mismatch: address '{address}' is for network '{actual}', expected '{expected}'.")]
+    #[error(
+        "Address network mismatch: address '{address}' is for network '{actual}', expected '{expected}'."
+    )]
     AddressNetworkMismatch {
         address: String,
         expected: String,
@@ -40,7 +46,9 @@ pub enum AppError {
     #[error("Transaction amount must be strictly greater than 0 satoshis.")]
     ZeroAmount,
 
-    #[error("Insufficient funds: needed {needed} satoshis (including fees), but only {available} satoshis are available.")]
+    #[error(
+        "Insufficient funds: needed {needed} satoshis (including fees), but only {available} satoshis are available."
+    )]
     InsufficientFunds { needed: u64, available: u64 },
 
     #[error("Failed to sign transaction: {0}")]

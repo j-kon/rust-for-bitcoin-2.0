@@ -60,7 +60,10 @@ impl NodeClient {
     }
 
     /// Validates connectivity and verifies that the connected node is on the expected network.
-    pub fn check_connection(&self, expected_network: Network) -> Result<GetBlockchainInfoResult, AppError> {
+    pub fn check_connection(
+        &self,
+        expected_network: Network,
+    ) -> Result<GetBlockchainInfoResult, AppError> {
         let info = self.client.get_blockchain_info().map_err(|err| {
             let err_str = err.to_string();
             if err_str.contains("Unauthorized") || err_str.contains("401") {

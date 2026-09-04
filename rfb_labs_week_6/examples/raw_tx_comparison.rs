@@ -23,7 +23,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Generate local key material with secp256k1
     let secp = Secp256k1::new();
     let secret_key = SecretKey::from_slice(&[0x11; 32])?;
-    let pubkey = CompressedPublicKey::from_private_key(&secp, &bitcoin::PrivateKey::new(secret_key, Network::Regtest))?;
+    let pubkey = CompressedPublicKey::from_private_key(
+        &secp,
+        &bitcoin::PrivateKey::new(secret_key, Network::Regtest),
+    )?;
     let sender_addr = Address::p2wpkh(&pubkey, Network::Regtest);
 
     println!("Sender P2WPKH Address: {}", sender_addr);
@@ -88,12 +91,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("=== Final Signed Transaction ===");
     println!("Signed TXID:           {}", final_txid);
-    println!("Witness Stack Elements: {}", signed_tx.input[0].witness.len());
+    println!(
+        "Witness Stack Elements: {}",
+        signed_tx.input[0].witness.len()
+    );
     println!("Serialized Raw Hex:    {}", raw_hex);
     println!();
     println!("Contrast with BDK:");
-    println!("- rust-bitcoin: Manual coin selection, manual fee calculation, manual sighash cache, and manual witness assembly.");
-    println!("- BDK: High-level TxBuilder handles coin selection, change output derivation from internal keychain, fee rate calculation, and automatic PSBT signing from descriptors.");
+    println!(
+        "- rust-bitcoin: Manual coin selection, manual fee calculation, manual sighash cache, and manual witness assembly."
+    );
+    println!(
+        "- BDK: High-level TxBuilder handles coin selection, change output derivation from internal keychain, fee rate calculation, and automatic PSBT signing from descriptors."
+    );
 
     Ok(())
 }
