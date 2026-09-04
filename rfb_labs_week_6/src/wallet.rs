@@ -213,12 +213,47 @@ impl AppWallet {
             network: self.wallet.network(),
         })
     }
+
+    /// Derives and persists the next internal change address.
+    pub fn new_internal_address(&mut self) -> Result<GeneratedAddress, AppError> {
+        let info = self.wallet.reveal_next_address(KeychainKind::Internal);
+        self.persist()?;
+        Ok(GeneratedAddress {
+            address: info.address,
+            index: info.index,
+            keychain: KeychainKind::Internal,
+            network: self.wallet.network(),
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_keychain_separation() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+        std::fs::remove_file(&db_path).unwrap();
+
+        let mut config = AppConfig::default();
+        config.db_path = db_path;
+
+        AppWallet::init(&config).expect("init should succeed");
+        let mut wallet = AppWallet::open(&config).expect("open should succeed");
+
+        let ext_addr = wallet.new_external_address().expect("new external address");
+        let int_addr = wallet.new_internal_address().expect("new internal address");
+
+        assert_eq!(ext_addr.keychain, KeychainKind::External);
+        assert_eq!(int_addr.keychain, KeychainKind::Internal);
+        assert_eq!(ext_addr.index, 0);
+        assert_eq!(int_addr.index, 0);
+        // Addresses must differ even at same index because derivation paths differ (0/0 vs 0/1)
+        assert_ne!(ext_addr.address, int_addr.address);
+    }
 
     #[test]
     fn test_wallet_init_and_reopen() {
